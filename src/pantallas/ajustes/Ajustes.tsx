@@ -52,7 +52,9 @@ export default function Ajustes() {
 
       <TablaCaducidades duraciones={ajustes.duraciones} />
 
-      <p className="pb-4 text-center text-sm text-suave">One Tomato 🍅 · tus datos solo están en este iPhone</p>
+      <p className="pb-4 text-center text-sm text-suave">One Tomato 🍅 · versión {__VERSION__}
+        <br />
+        Tus datos solo están en este iPhone</p>
     </div>
   )
 }

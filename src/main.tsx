@@ -1,4 +1,5 @@
 import { StrictMode } from 'react'
+import { registerSW } from 'virtual:pwa-register'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Route, Routes } from 'react-router'
 import './index.css'
@@ -16,6 +17,18 @@ import Sesion from './pantallas/cocinar/Sesion.tsx'
 
 // Nada más abrir, pedimos al iPhone que conserve nuestros datos
 pedirAlmacenamientoPersistente()
+
+// Busca versiones nuevas al abrir y cada vez que vuelves a la app; si hay una, recarga sola.
+// (En iPhone la app se queda "dormida" en segundo plano y no se recarga por sí misma.)
+registerSW({
+  immediate: true,
+  onRegisteredSW(_url, registro) {
+    if (!registro) return
+    const buscar = () => registro.update().catch(() => {})
+    document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && buscar())
+    setInterval(buscar, 60 * 60 * 1000)
+  },
+})
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

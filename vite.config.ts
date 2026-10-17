@@ -5,12 +5,15 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
+  // Fecha de la versión, visible en Ajustes para comprobar que tienes la última
+  define: { __VERSION__: JSON.stringify(new Date().toISOString().slice(0, 16).replace('T', ' ')) },
   plugins: [
     react(),
     tailwindcss(),
     // Convierte la web en una app instalable que funciona sin conexión
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: false, // lo registramos nosotros en main.tsx para buscar actualizaciones
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
         name: 'One Tomato',
@@ -29,6 +32,8 @@ export default defineConfig({
       },
       workbox: {
         navigateFallback: '/index.html',
+        clientsClaim: true,
+        skipWaiting: true,
       },
     }),
   ],

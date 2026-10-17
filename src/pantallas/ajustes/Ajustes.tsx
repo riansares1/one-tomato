@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Download, Upload } from 'lucide-react'
+import { Copy, Download, Upload } from 'lucide-react'
 import { useAviso } from '../../componentes/Aviso'
 import { BotonPrincipal, BotonSecundario, Campo, claseEntrada } from '../../componentes/Campos'
 import { guardarAjustes, useAjustes } from '../../datos/ajustes'
@@ -8,6 +8,8 @@ import { exportarCopia, importarCopia, leerCopia } from '../../datos/copia'
 import type { Ajustes as TipoAjustes, Zona } from '../../datos/tipos'
 import { CATEGORIAS, DURACIONES_POR_DEFECTO } from '../../logica/caducidad'
 import { fechaCorta, relativa } from '../../logica/fechas'
+import { INSTRUCCIONES_FIJAS } from '../../ia/prompt'
+import { copiar } from '../../logica/portapapeles'
 
 const DIAS = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo']
 
@@ -45,6 +47,8 @@ export default function Ajustes() {
           </div>
         </div>
       </Seccion>
+
+      <InstruccionesIA key={ajustes.instruccionesIA} extra={ajustes.instruccionesIA} />
 
       <TablaCaducidades duraciones={ajustes.duraciones} />
 
@@ -194,6 +198,35 @@ function TablaCaducidades({ duraciones }: { duraciones: TipoAjustes['duraciones'
       >
         Restaurar valores iniciales
       </BotonSecundario>
+    </Seccion>
+  )
+}
+
+function InstruccionesIA({ extra }: { extra: string }) {
+  const aviso = useAviso()
+  const [texto, setTexto] = useState(extra)
+  const [ver, setVer] = useState(false)
+  const completas = () => INSTRUCCIONES_FIJAS + (texto.trim() ? `\n\nMIS INSTRUCCIONES EXTRA\n${texto.trim()}` : '')
+
+  return (
+    <Seccion titulo="Instrucciones para la IA" detalle="Las reglas fijas que van en cada prompt. Puedes copiarlas a un Proyecto de Claude para no repetirlas.">
+      <Campo etiqueta="Mis instrucciones extra (opcional)" ayuda="Se añaden a las reglas fijas en cada prompt.">
+        <textarea
+          className={`${claseEntrada} resize-none`}
+          rows={3}
+          value={texto}
+          placeholder="Ej.: prefiero cenas ligeras; los lunes no tengo microondas"
+          onChange={(e) => setTexto(e.target.value)}
+          onBlur={() => texto !== extra && guardarAjustes({ instruccionesIA: texto.trim() })}
+        />
+      </Campo>
+      <BotonSecundario onClick={async () => aviso((await copiar(completas())) ? 'Instrucciones copiadas' : 'No se pudo copiar')}>
+        <Copy size={18} /> Copiar instrucciones fijas
+      </BotonSecundario>
+      <button className="text-sm font-semibold text-tomate" onClick={() => setVer(!ver)}>
+        {ver ? 'Ocultar' : 'Ver'} las reglas fijas
+      </button>
+      {ver && <pre className="max-h-80 overflow-auto rounded-2xl bg-fondo p-3 text-xs whitespace-pre-wrap">{INSTRUCCIONES_FIJAS}</pre>}
     </Seccion>
   )
 }

@@ -17,13 +17,14 @@ const TITULOS: Record<string, string> = {
   '/compra': 'Compra',
   '/escanear': 'Escanear',
   '/ajustes': 'Ajustes',
+  '/cocinar': 'Sesión de cocina',
 }
 
 // Estructura común: barra superior, contenido y barra inferior
 export default function App() {
   const { pathname } = useLocation()
   const navegar = useNavigate()
-  const esSubpantalla = pathname === '/ajustes' || pathname === '/escanear'
+  const esSubpantalla = ['/ajustes', '/escanear', '/cocinar'].includes(pathname)
 
   return (
     <div className="mx-auto min-h-dvh max-w-lg">

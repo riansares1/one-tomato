@@ -15,10 +15,15 @@ export async function recordarUsado(p: Producto) {
   })
 }
 
-// ¿Ya hay un producto igual (mismo nombre, zona y unidad) en el inventario?
+// ¿Ya hay un producto igual en la misma zona y unidad? (mismo nombre o mismo código de barras)
 export async function buscarDuplicado(p: Producto): Promise<Producto | undefined> {
   const mismos = await db.productos.where('zona').equals(p.zona).toArray()
-  return mismos.find((o) => o.id !== p.id && clave(o.nombre) === clave(p.nombre) && o.unidad === p.unidad)
+  return mismos.find(
+    (o) =>
+      o.id !== p.id &&
+      o.unidad === p.unidad &&
+      (clave(o.nombre) === clave(p.nombre) || (!!p.codigoBarras && o.codigoBarras === p.codigoBarras)),
+  )
 }
 
 export async function guardarProducto(p: Producto) {

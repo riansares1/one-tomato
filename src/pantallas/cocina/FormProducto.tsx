@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Trash2 } from 'lucide-react'
 import { BotonPrincipal, BotonSecundario, Campo, claseEntrada, Selector } from '../../componentes/Campos'
 import { leerNumero, mostrarNumero } from '../../logica/numeros'
@@ -27,26 +27,32 @@ const UNIDADES: { valor: Unidad; texto: string }[] = [
 
 interface Props {
   producto?: Producto // si viene, estamos editando
-  zonaInicial: Zona
+  inicial?: Partial<Producto> // producto nuevo ya rellenado (escáner, compra...)
+  zonaInicial?: Zona // si no se indica, se elige según el tipo de alimento
+  titulo?: string
+  mensaje?: ReactNode
   onCerrar: () => void
+  onGuardado?: (p: Producto) => unknown
 }
 
-export default function FormProducto({ producto, zonaInicial, onCerrar }: Props) {
+export default function FormProducto({ producto, inicial, zonaInicial, titulo, mensaje, onCerrar, onGuardado }: Props) {
   const ajustes = useAjustes()
   const aviso = useAviso()
   const editando = !!producto
+  const base: Partial<Producto> | undefined = producto ?? inicial
 
-  const [nombre, setNombre] = useState(producto?.nombre ?? '')
-  const [marca, setMarca] = useState(producto?.marca ?? '')
-  const [cantidad, setCantidad] = useState(producto ? mostrarNumero(producto.cantidad) : '1')
-  const [unidad, setUnidad] = useState<Unidad>(producto?.unidad ?? 'ud')
-  const [zona, setZona] = useState<Zona>(producto?.zona ?? zonaInicial)
+  const [nombre, setNombre] = useState(base?.nombre ?? '')
+  const [marca, setMarca] = useState(base?.marca ?? '')
+  const [cantidad, setCantidad] = useState(base?.cantidad ? mostrarNumero(base.cantidad) : '1')
+  const [unidad, setUnidad] = useState<Unidad>(base?.unidad ?? 'ud')
   // null = la adivinamos por el nombre; si la eliges a mano, se queda la tuya
-  const [catElegida, setCatElegida] = useState<string | null>(producto?.categoria ?? null)
+  const [catElegida, setCatElegida] = useState<string | null>(base?.categoria ?? null)
   const cat = catElegida ?? adivinarCategoria(nombre)
+  const [zonaElegida, setZona] = useState<Zona | null>(base?.zona ?? zonaInicial ?? null)
+  const zona = zonaElegida ?? categoria(cat).zonaHabitual
   // Solo mostramos la fecha si es "real"; las estimadas se recalculan solas
-  const [caducidad, setCaducidad] = useState(producto?.caducidadTipo === 'real' ? (producto.caducidad ?? '') : '')
-  const [verMas, setVerMas] = useState(!!producto?.marca)
+  const [caducidad, setCaducidad] = useState(base?.caducidadTipo === 'real' ? (base.caducidad ?? '') : '')
+  const [verMas, setVerMas] = useState(!!base?.marca)
   const [sugerencias, setSugerencias] = useState<Usado[]>([])
   const [duplicado, setDuplicado] = useState<{ existente: Producto; nuevo: Producto } | null>(null)
 
@@ -87,7 +93,7 @@ export default function FormProducto({ producto, zonaInicial, onCerrar }: Props)
       categoria: cat,
       caducidad: caducidad || caducidadEstimada(),
       caducidadTipo: caducidad ? 'real' : 'estimada',
-      codigoBarras: producto?.codigoBarras,
+      codigoBarras: base?.codigoBarras,
       anadidoEl: producto?.anadidoEl ?? hoy(),
     }
   }
@@ -99,6 +105,7 @@ export default function FormProducto({ producto, zonaInicial, onCerrar }: Props)
       if (existente) return setDuplicado({ existente, nuevo: p })
     }
     await guardarProducto(p)
+    await onGuardado?.(p)
     aviso(editando ? 'Cambios guardados' : `Añadido: ${p.nombre}`)
     onCerrar()
   }
@@ -111,41 +118,23 @@ export default function FormProducto({ producto, zonaInicial, onCerrar }: Props)
   }
 
   if (duplicado) {
-    const { existente, nuevo } = duplicado
     return (
-      <Hoja titulo="Ya lo tienes" onCerrar={onCerrar}>
-        <p className="mb-5 text-lg">
-          Ya tienes <b>{existente.nombre}</b> ({mostrarNumero(existente.cantidad)} {existente.unidad}) en {existente.zona}. ¿Sumo{' '}
-          {mostrarNumero(nuevo.cantidad)} {nuevo.unidad} y queda en {mostrarNumero(existente.cantidad + nuevo.cantidad)} {nuevo.unidad}?
-        </p>
-        <div className="space-y-3">
-          <BotonPrincipal
-            onClick={async () => {
-              await sumarA(existente, nuevo)
-              aviso(`Sumado a ${existente.nombre}`)
-              onCerrar()
-            }}
-          >
-            Sí, sumar
-          </BotonPrincipal>
-          <BotonSecundario
-            onClick={async () => {
-              await guardarProducto(nuevo)
-              aviso(`Añadido aparte: ${nuevo.nombre}`)
-              onCerrar()
-            }}
-          >
-            No, añadir aparte
-          </BotonSecundario>
-        </div>
-      </Hoja>
+      <PreguntaSumar
+        {...duplicado}
+        onHecho={async () => {
+          await onGuardado?.(duplicado.nuevo)
+          onCerrar()
+        }}
+        onCerrar={onCerrar}
+      />
     )
   }
 
   const c = categoria(cat)
 
   return (
-    <Hoja titulo={editando ? 'Editar producto' : 'Añadir producto'} onCerrar={onCerrar}>
+    <Hoja titulo={titulo ?? (editando ? 'Editar producto' : 'Añadir producto')} onCerrar={onCerrar}>
+      {mensaje && <div className="mb-4 rounded-2xl bg-orange-50 p-3 text-sm text-orange-900">{mensaje}</div>}
       <form
         className="space-y-5"
         onSubmit={(e) => {
@@ -245,6 +234,49 @@ export default function FormProducto({ producto, zonaInicial, onCerrar }: Props)
           </BotonSecundario>
         )}
       </form>
+    </Hoja>
+  )
+}
+
+// "Ya tienes X. ¿Sumo la cantidad?" — se usa al añadir a mano y al escanear
+export function PreguntaSumar({
+  existente,
+  nuevo,
+  onHecho,
+  onCerrar,
+}: {
+  existente: Producto
+  nuevo: Producto
+  onHecho: () => void
+  onCerrar: () => void
+}) {
+  const aviso = useAviso()
+  return (
+    <Hoja titulo="Ya lo tienes" onCerrar={onCerrar}>
+      <p className="mb-5 text-lg">
+        Ya tienes <b>{existente.nombre}</b> ({mostrarNumero(existente.cantidad)} {existente.unidad}) en {existente.zona}. ¿Sumo{' '}
+        {mostrarNumero(nuevo.cantidad)} {nuevo.unidad} y queda en {mostrarNumero(existente.cantidad + nuevo.cantidad)} {nuevo.unidad}?
+      </p>
+      <div className="space-y-3">
+        <BotonPrincipal
+          onClick={async () => {
+            await sumarA(existente, nuevo)
+            aviso(`Sumado a ${existente.nombre}`)
+            onHecho()
+          }}
+        >
+          Sí, sumar
+        </BotonPrincipal>
+        <BotonSecundario
+          onClick={async () => {
+            await guardarProducto(nuevo)
+            aviso(`Añadido aparte: ${nuevo.nombre}`)
+            onHecho()
+          }}
+        >
+          No, añadir aparte
+        </BotonSecundario>
+      </div>
     </Hoja>
   )
 }

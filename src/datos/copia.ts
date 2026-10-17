@@ -58,7 +58,7 @@ export async function leerCopia(archivo: File): Promise<{ copia: Copia; resumen:
   }
   const n = (t: string) => copia.tablas[t]?.length ?? 0
   const fecha = new Date(copia.exportadoEl).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
-  return { copia, resumen: `Copia del ${fecha}: ${n('productos')} productos y ${n('tuppers')} tuppers.` }
+  return { copia, resumen: `Copia del ${fecha}: ${n('productos')} productos, ${n('tuppers')} tuppers, ${n('recetas')} recetas y ${n('planes')} menús.` }
 }
 
 // Sustituye TODOS los datos actuales por los de la copia

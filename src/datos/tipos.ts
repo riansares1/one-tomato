@@ -68,3 +68,67 @@ export interface Ajustes {
   instruccionesIA: string
   ultimaCopia?: string
 }
+
+// ---- Recetas ----
+
+export interface Ingrediente {
+  nombre: string
+  cantidad?: number | null
+  unidad?: string | null
+}
+
+export interface Receta {
+  id: string
+  nombre: string
+  estado: 'quiero-probar' | 'favorita' | 'archivada'
+  enlace?: string
+  tipoEnlace?: 'web' | 'video'
+  nota?: string
+  raciones?: number
+  ingredientes?: Ingrediente[]
+  pasos?: string[]
+  creadaEl: string
+  // Día en que la cocinaste (para preguntarte qué tal)
+  probadaEl?: string
+}
+
+// ---- Plan semanal ----
+
+export interface RespuestasAsistente {
+  desde: string
+  hasta: string
+  diaCocina: string
+  diasUni: string[]
+  fuera: { fecha: string; comida: boolean; cena: boolean }[]
+  tiempo: string
+  antojos: string
+  recetasAProbar: string[] // ids de recetas "quiero probar"
+  notas: string
+}
+
+export interface EstadoSesion {
+  pasosHechos: number[]
+  // Hora (ms) en que termina cada temporizador en marcha, o ms restantes si está en pausa
+  temporizadores: Record<number, { fin?: number; restante?: number }>
+  completadaEl?: string
+}
+
+export interface PlanSemanal {
+  id: string
+  creadoEl: string
+  desde: string
+  hasta: string
+  respuestas?: RespuestasAsistente
+  menu: import('../ia/esquema').MenuIA
+  sesion: EstadoSesion
+}
+
+export interface ItemCompra {
+  id: string
+  planId?: string
+  nombre: string
+  cantidad?: number | null
+  unidad?: string | null
+  seccion: string
+  comprado: boolean
+}

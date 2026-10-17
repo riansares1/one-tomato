@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { Link, useSearchParams } from 'react-router'
 import { Plus, ScanBarcode } from 'lucide-react'
 import { useAviso } from '../../componentes/Aviso'
+import Vacio from '../../componentes/Vacio'
 import { mostrarNumero } from '../../logica/numeros'
 import { useAjustes } from '../../datos/ajustes'
 import { db } from '../../datos/db'
@@ -124,16 +125,6 @@ export default function MiCocina() {
 
 const claseBotonFlotante =
   'flex min-h-14 items-center justify-center gap-2 rounded-2xl text-base font-semibold shadow-lg ring-1 ring-black/5 active:scale-[0.98] transition'
-
-function Vacio({ emoji, texto, detalle }: { emoji: string; texto: string; detalle: string }) {
-  return (
-    <div className="mt-10 flex flex-col items-center px-6 text-center">
-      <div className="mb-3 text-6xl">{emoji}</div>
-      <p className="text-lg font-semibold">{texto}</p>
-      <p className="mt-1 text-suave">{detalle}</p>
-    </div>
-  )
-}
 
 function TextoCaducidad({ caducidad, estimada }: { caducidad?: string; estimada?: boolean }) {
   const u = urgencia(caducidad)

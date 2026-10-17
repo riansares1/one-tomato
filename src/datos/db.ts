@@ -1,14 +1,16 @@
 import Dexie, { type EntityTable } from 'dexie'
-import type { Ajustes, Producto, ProductoConocido, Tupper, Usado } from './tipos'
+import type { Ajustes, ItemCompra, PlanSemanal, Producto, ProductoConocido, Receta, Tupper, Usado } from './tipos'
 
 // Base de datos local del iPhone (IndexedDB), manejada con Dexie.
-// Las tablas de recetas, planes y compra se añadirán en la fase 3.
 export const db = new Dexie('one-tomato') as Dexie & {
   productos: EntityTable<Producto, 'id'>
   tuppers: EntityTable<Tupper, 'id'>
   usados: EntityTable<Usado, 'clave'>
   productosConocidos: EntityTable<ProductoConocido, 'codigoBarras'>
   ajustes: EntityTable<Ajustes, 'id'>
+  recetas: EntityTable<Receta, 'id'>
+  planes: EntityTable<PlanSemanal, 'id'>
+  compra: EntityTable<ItemCompra, 'id'>
 }
 
 db.version(1).stores({
@@ -17,6 +19,13 @@ db.version(1).stores({
   usados: 'clave',
   productosConocidos: 'codigoBarras',
   ajustes: 'id',
+})
+
+// Versión 2: recetas, planes semanales y lista de la compra
+db.version(2).stores({
+  recetas: 'id, estado',
+  planes: 'id, creadoEl',
+  compra: 'id, planId',
 })
 
 export const nuevoId = () => crypto.randomUUID()

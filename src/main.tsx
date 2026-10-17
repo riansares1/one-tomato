@@ -4,11 +4,15 @@ import { BrowserRouter, Route, Routes } from 'react-router'
 import './index.css'
 import App from './App.tsx'
 import { ProveedorAvisos } from './componentes/Aviso.tsx'
-import Proximamente from './componentes/Proximamente.tsx'
 import { pedirAlmacenamientoPersistente } from './datos/db.ts'
 import Ajustes from './pantallas/ajustes/Ajustes.tsx'
 import MiCocina from './pantallas/cocina/MiCocina.tsx'
 import Inicio from './pantallas/inicio/Inicio.tsx'
+import Escanear from './pantallas/escanear/Escanear.tsx'
+import Semana from './pantallas/semana/Semana.tsx'
+import Recetas from './pantallas/recetas/Recetas.tsx'
+import Compra from './pantallas/compra/Compra.tsx'
+import Sesion from './pantallas/cocinar/Sesion.tsx'
 
 // Nada más abrir, pedimos al iPhone que conserve nuestros datos
 pedirAlmacenamientoPersistente()
@@ -21,10 +25,11 @@ createRoot(document.getElementById('root')!).render(
           <Route element={<App />}>
             <Route index element={<Inicio />} />
             <Route path="cocina" element={<MiCocina />} />
-            <Route path="escanear" element={<Proximamente emoji="📷" titulo="Escáner de códigos de barras" fase={2} />} />
-            <Route path="semana" element={<Proximamente emoji="📅" titulo="Plan semanal y menú" fase={3} />} />
-            <Route path="recetas" element={<Proximamente emoji="📖" titulo="Favoritas y Quiero probar" fase={3} />} />
-            <Route path="compra" element={<Proximamente emoji="🛒" titulo="Lista de la compra" fase={3} />} />
+            <Route path="escanear" element={<Escanear />} />
+            <Route path="semana" element={<Semana />} />
+            <Route path="recetas" element={<Recetas />} />
+            <Route path="compra" element={<Compra />} />
+            <Route path="cocinar" element={<Sesion />} />
             <Route path="ajustes" element={<Ajustes />} />
             <Route path="*" element={<Inicio />} />
           </Route>

@@ -1,1 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🍅</text></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#faf6f1"/>
+  <ellipse cx="256" cy="290" rx="168" ry="150" fill="#e5482f"/>
+  <ellipse cx="200" cy="240" rx="42" ry="26" fill="#f27a63" transform="rotate(-30 200 240)"/>
+  <path d="M256 170 L214 120 L250 150 L256 100 L262 150 L298 120 Z M256 170 L190 160 L240 150 Z M256 170 L322 160 L272 150 Z" fill="#3f8f3a" stroke="#3f8f3a" stroke-width="14" stroke-linejoin="round"/>
+  <rect x="249" y="80" width="14" height="44" rx="7" fill="#2f6e2b"/>
+</svg>

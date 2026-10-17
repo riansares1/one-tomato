@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+/* Colores de la app: fondos neutros cálidos y acento tomate */
+@theme {
+  --color-fondo: #faf6f1;
+  --color-tarjeta: #ffffff;
+  --color-texto: #2b2420;
+  --color-suave: #7a6e66;
+  --color-tomate: #e5482f;
+  --color-tomate-oscuro: #c23a24;
+}
+
+body {
+  background-color: var(--color-fondo);
+  color: var(--color-texto);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}

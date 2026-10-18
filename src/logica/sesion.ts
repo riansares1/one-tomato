@@ -1,4 +1,5 @@
 import { db, nuevoId } from '../datos/db'
+import { guardarTuppers } from './tuppers'
 import type { PlanSemanal, Producto, Tupper } from '../datos/tipos'
 import { hoy } from './fechas'
 import { convertir, normalizarUnidad } from './unidades'
@@ -32,12 +33,16 @@ export interface Resta {
   problema?: string
 }
 
-// Calcula qué restar del inventario (agrupando el mismo producto)
-export function calcularRestas(plan: PlanSemanal, productos: Producto[]): Resta[] {
+// Calcula qué restar del inventario (agrupando el mismo producto).
+// Se saltan las recetas cuyos ingredientes ya se restaron al guardar sus tuppers.
+export function calcularRestas(plan: PlanSemanal, productos: Producto[], soloRecetas?: string[]): Resta[] {
   const restas = new Map<string, Resta>()
   const sinProducto: Resta[] = []
+  const yaDescontadas = new Set(plan.sesion.recetasDescontadas ?? [])
 
   for (const receta of plan.menu.recetas) {
+    if (yaDescontadas.has(receta.id)) continue
+    if (soloRecetas && !soloRecetas.includes(receta.id)) continue
     for (const ing of receta.ingredientes) {
       if (!ing.deInventario) continue
       const producto = buscarEnInventario(ing.nombre, productos)
@@ -75,8 +80,10 @@ export function calcularRestas(plan: PlanSemanal, productos: Producto[]): Resta[
   return [...restas.values(), ...sinProducto]
 }
 
-export function tuppersDelPlan(plan: PlanSemanal): Tupper[] {
-  return plan.menu.tuppersResultantes.map((t) => ({
+// Tupper propuesto por la IA → tupper real
+export function tupperPropuesto(plan: PlanSemanal, indice: number): Tupper {
+  const t = plan.menu.tuppersResultantes[indice]
+  return {
     id: nuevoId(),
     plato: t.plato,
     raciones: t.raciones,
@@ -86,7 +93,48 @@ export function tuppersDelPlan(plan: PlanSemanal): Tupper[] {
     falta: t.falta ?? undefined,
     pasarANeveraEl: t.pasarANeveraEl ?? undefined,
     planId: plan.id,
-  }))
+    recetaId: t.recetaId ?? undefined,
+  }
+}
+
+// Los tuppers propuestos que aún no has guardado
+export function tuppersPendientes(plan: PlanSemanal): { indice: number; tupper: Tupper }[] {
+  const guardados = new Set(plan.sesion.tuppersGuardados ?? [])
+  return plan.menu.tuppersResultantes.map((_, i) => i).filter((i) => !guardados.has(i)).map((indice) => ({ indice, tupper: tupperPropuesto(plan, indice) }))
+}
+
+// Resta del inventario (nunca por debajo de cero). Usar dentro de una transacción.
+async function aplicarRestas(restas: Resta[]) {
+  for (const r of restas) {
+    if (!r.producto || r.problema || r.restar <= 0) continue
+    const actual = await db.productos.get(r.producto.id)
+    if (!actual) continue
+    const queda = Math.max(0, actual.cantidad - r.restar)
+    if (queda <= 0) await db.productos.delete(actual.id)
+    else await db.productos.update(actual.id, { cantidad: Math.round(queda * 100) / 100 })
+  }
+}
+
+// Guardar tuppers de una receta mientras cocinas (desde Semana).
+// La primera vez que guardas un tupper de una receta se restan sus ingredientes.
+export async function guardarTupperDeReceta(planId: string, tupper: Tupper, indicePropuesto?: number): Promise<{ restados: string[] }> {
+  const restados: string[] = []
+  await db.transaction('rw', db.planes, db.tuppers, db.productos, async () => {
+    const plan = await db.planes.get(planId)
+    if (!plan) return
+    const recetaId = tupper.recetaId
+    const descontar = !!recetaId && !plan.sesion.completadaEl && !(plan.sesion.recetasDescontadas ?? []).includes(recetaId)
+    if (descontar) {
+      const restas = calcularRestas(plan, await db.productos.toArray(), [recetaId])
+      await aplicarRestas(restas)
+      restados.push(...restas.filter((r) => r.producto && !r.problema && r.restar > 0).map((r) => r.producto!.nombre))
+    }
+    await guardarTuppers(planId, [tupper], (p) => ({
+      tuppersGuardados: indicePropuesto == null ? p.sesion.tuppersGuardados : [...(p.sesion.tuppersGuardados ?? []), indicePropuesto],
+      recetasDescontadas: descontar ? [...(p.sesion.recetasDescontadas ?? []), recetaId!] : p.sesion.recetasDescontadas,
+    }))
+  })
+  return { restados }
 }
 
 // Aplica el final de la sesión: todo o nada, y solo una vez por plan
@@ -95,15 +143,11 @@ export async function terminarSesion(planId: string, tuppers: Tupper[], restas: 
     const plan = await db.planes.get(planId)
     if (!plan || plan.sesion.completadaEl) return false // ya se registró antes: no restamos dos veces
 
-    await db.tuppers.bulkAdd(tuppers)
-    for (const r of restas) {
-      if (!r.producto || r.restar <= 0) continue
-      const actual = await db.productos.get(r.producto.id)
-      if (!actual) continue
-      const queda = Math.max(0, actual.cantidad - r.restar)
-      if (queda <= 0) await db.productos.delete(actual.id)
-      else await db.productos.update(actual.id, { cantidad: Math.round(queda * 100) / 100 })
-    }
+    await aplicarRestas(restas)
+    await guardarTuppers(planId, tuppers, (p) => ({
+      tuppersGuardados: p.menu.tuppersResultantes.map((_, i) => i),
+      recetasDescontadas: p.menu.recetas.map((r) => r.id),
+    }))
 
     // Las recetas "quiero probar" cocinadas quedan pendientes de valorar
     const aProbar = await db.recetas.where('estado').equals('quiero-probar').toArray()
@@ -116,7 +160,8 @@ export async function terminarSesion(planId: string, tuppers: Tupper[], restas: 
       if (r) await db.recetas.update(r.id, { probadaEl: hoy() })
     }
 
-    await db.planes.update(planId, { sesion: { ...plan.sesion, completadaEl: hoy() } })
+    const actualizado = await db.planes.get(planId)
+    await db.planes.update(planId, { sesion: { ...actualizado!.sesion, completadaEl: hoy() } })
     return true
   })
 }

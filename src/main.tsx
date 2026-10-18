@@ -6,6 +6,7 @@ import './index.css'
 import App from './App.tsx'
 import { ProveedorAvisos } from './componentes/Aviso.tsx'
 import { pedirAlmacenamientoPersistente } from './datos/db.ts'
+import { consumirPasados } from './logica/tuppers.ts'
 import Ajustes from './pantallas/ajustes/Ajustes.tsx'
 import MiCocina from './pantallas/cocina/MiCocina.tsx'
 import Inicio from './pantallas/inicio/Inicio.tsx'
@@ -17,6 +18,10 @@ import Sesion from './pantallas/cocinar/Sesion.tsx'
 
 // Nada más abrir, pedimos al iPhone que conserve nuestros datos
 pedirAlmacenamientoPersistente()
+
+// Las raciones reservadas en el menú de días ya pasados se dan por comidas
+consumirPasados()
+document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && consumirPasados())
 
 // Busca versiones nuevas al abrir y cada vez que vuelves a la app; si hay una, recarga sola.
 // (En iPhone la app se queda "dormida" en segundo plano y no se recarga por sí misma.)

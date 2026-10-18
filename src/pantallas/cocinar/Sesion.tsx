@@ -11,7 +11,7 @@ import type { EstadoSesion, PlanSemanal, Tupper } from '../../datos/tipos'
 import { fechaCorta } from '../../logica/fechas'
 import { mostrarNumero } from '../../logica/numeros'
 import { usePlanActual } from '../../logica/plan'
-import { calcularRestas, terminarSesion, tuppersDelPlan, type Resta } from '../../logica/sesion'
+import { calcularRestas, terminarSesion, tuppersPendientes, type Resta } from '../../logica/sesion'
 
 // ---- Sonido de alarma (Web Audio; se activa al tocar el primer "Empezar") ----
 let audio: AudioContext | null = null
@@ -204,7 +204,8 @@ function Terminar({ plan, onCerrar }: { plan: PlanSemanal; onCerrar: () => void 
   const aviso = useAviso()
   const navegar = useNavigate()
   const productos = useLiveQuery(() => db.productos.toArray(), [])
-  const [tuppers, setTuppers] = useState<(Tupper & { incluir: boolean })[]>(() => tuppersDelPlan(plan).map((t) => ({ ...t, incluir: true })))
+  const [tuppers, setTuppers] = useState<(Tupper & { incluir: boolean })[]>(() => tuppersPendientes(plan).map(({ tupper }) => ({ ...tupper, incluir: true })))
+  const yaGuardados = plan.sesion.tuppersGuardados?.length ?? 0
   const [quitadas, setQuitadas] = useState<Set<string>>(new Set())
   if (!productos) return null
 
@@ -212,7 +213,11 @@ function Terminar({ plan, onCerrar }: { plan: PlanSemanal; onCerrar: () => void 
   const cambiarTupper = (n: number, c: Partial<Tupper & { incluir: boolean }>) => setTuppers((ts) => ts.map((t, i) => (i === n ? { ...t, ...c } : t)))
 
   async function confirmar() {
-    const elegidos: Tupper[] = tuppers.filter((t) => t.incluir).map((t) => ({ ...t, incluir: undefined }))
+    const elegidos: Tupper[] = tuppers.filter((t) => t.incluir).map((t) => {
+      const copia: Partial<typeof t> = { ...t }
+      delete copia.incluir
+      return copia as Tupper
+    })
     const aRestar = restas.filter((r: Resta) => r.producto && !r.problema && !quitadas.has(r.clave))
     const hecho = await terminarSesion(plan.id, elegidos, aRestar)
     aviso(hecho ? `¡Buen trabajo! ${elegidos.length} tuppers guardados 🥡` : 'Esta sesión ya estaba registrada: no he cambiado nada.')
@@ -225,7 +230,8 @@ function Terminar({ plan, onCerrar }: { plan: PlanSemanal; onCerrar: () => void 
       <div className="space-y-5">
         <section>
           <h3 className="mb-2 font-bold">🥡 Tuppers que se crean</h3>
-          {tuppers.length === 0 && <p className="text-sm text-suave">El menú no indica tuppers. Puedes añadirlos después en Mi cocina.</p>}
+          {yaGuardados > 0 && <p className="mb-2 text-sm text-emerald-700">✓ {yaGuardados} {yaGuardados === 1 ? 'tupper ya guardado' : 'tuppers ya guardados'} desde Semana.</p>}
+          {tuppers.length === 0 && <p className="text-sm text-suave">{yaGuardados ? 'No quedan tuppers por guardar.' : 'El menú no indica tuppers. Puedes añadirlos después en Mi cocina.'}</p>}
           <ul className="space-y-2">
             {tuppers.map((t, n) => (
               <li key={t.id} className={`space-y-2 rounded-2xl bg-tarjeta p-3 ring-1 ring-black/5 ${t.incluir ? '' : 'opacity-50'}`}>
@@ -257,7 +263,7 @@ function Terminar({ plan, onCerrar }: { plan: PlanSemanal; onCerrar: () => void 
         <section>
           <h3 className="mb-1 font-bold">📦 Se resta de tu inventario</h3>
           <p className="mb-2 text-xs text-suave">Aproximado. Desmarca lo que no quieras tocar.</p>
-          {restas.length === 0 && <p className="text-sm text-suave">Nada que restar.</p>}
+          {restas.length === 0 && <p className="text-sm text-suave">Nada que restar{plan.sesion.recetasDescontadas?.length ? ' (lo de las recetas que ya guardaste se restó entonces)' : ''}.</p>}
           <ul className="space-y-1.5">
             {restas.map((r) => {
               const activa = !r.problema && !quitadas.has(r.clave)

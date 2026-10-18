@@ -15,10 +15,11 @@ interface Props {
   nota?: string | null
   onCerrar: () => void
   children?: ReactNode // botones de acción
+  arriba?: ReactNode // bloque destacado antes de los ingredientes
 }
 
 // Ficha de una receta: ingredientes, pasos y enlace original
-export default function DetalleReceta({ nombre, raciones, tiempoMin, ingredientes, pasos, enlace, nota, onCerrar, children }: Props) {
+export default function DetalleReceta({ nombre, raciones, tiempoMin, ingredientes, pasos, enlace, nota, onCerrar, children, arriba }: Props) {
   return (
     <Hoja titulo={nombre} onCerrar={onCerrar}>
       <div className="space-y-5">
@@ -28,6 +29,8 @@ export default function DetalleReceta({ nombre, raciones, tiempoMin, ingrediente
             {tiempoMin ? <span className="rounded-full bg-stone-100 px-3 py-1">⏱️ {tiempoMin} min</span> : null}
           </div>
         )}
+
+        {arriba}
 
         {enlace && (
           <a href={enlace} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-2xl bg-tarjeta p-3 font-semibold text-tomate ring-1 ring-black/5">

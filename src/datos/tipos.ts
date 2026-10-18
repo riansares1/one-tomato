@@ -29,6 +29,7 @@ export interface Tupper {
   enNeveraDesde?: string
   pasarANeveraEl?: string
   planId?: string
+  recetaId?: string
 }
 
 // Memoria de lo que he usado alguna vez, para el autocompletado
@@ -111,6 +112,9 @@ export interface EstadoSesion {
   // Hora (ms) en que termina cada temporizador en marcha, o ms restantes si está en pausa
   temporizadores: Record<number, { fin?: number; restante?: number }>
   completadaEl?: string
+  // Tuppers propuestos por la IA que ya guardaste (por su posición) y recetas cuyos ingredientes ya se restaron
+  tuppersGuardados?: number[]
+  recetasDescontadas?: string[]
 }
 
 export interface PlanSemanal {

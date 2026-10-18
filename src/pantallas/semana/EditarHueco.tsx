@@ -7,6 +7,8 @@ import { db } from '../../datos/db'
 import type { PlanSemanal } from '../../datos/tipos'
 import type { HuecoMenu } from '../../ia/esquema'
 import { cambiarHueco, etiquetaDia, huecoVacio } from '../../logica/plan'
+import { racionesLibres, reservas } from '../../logica/tuppers'
+import GuardarTupper from './GuardarTupper'
 
 // Cambiar a mano lo que comes en un momento del día
 export default function EditarHueco({ plan, fecha, momento, onCerrar }: { plan: PlanSemanal; fecha: string; momento: 'comida' | 'cena'; onCerrar: () => void }) {
@@ -16,8 +18,15 @@ export default function EditarHueco({ plan, fecha, momento, onCerrar }: { plan: 
   const [h, setH] = useState<HuecoMenu>(actual)
   const cambiar = (c: Partial<HuecoMenu>) => setH((x) => ({ ...x, ...c }))
 
+  // Raciones libres de cada tupper, sin contar la que reserva este mismo hueco
+  const res = reservas(plan)
+  if (actual.tupperId && !actual.consumido) res.set(actual.tupperId, (res.get(actual.tupperId) ?? 1) - 1)
+
   async function guardar() {
-    await cambiarHueco(plan, fecha, momento, { ...h, plato: h.plato.trim() })
+    const final: HuecoMenu = { ...h, plato: h.plato.trim() }
+    if (final.origen !== 'tupper-existente') final.tupperId = null // al quitar el tupper, la ración vuelve a estar libre
+    if (final.tupperId !== actual.tupperId) final.consumido = false
+    await cambiarHueco(plan, fecha, momento, final)
     aviso('Menú actualizado')
     onCerrar()
   }
@@ -33,21 +42,37 @@ export default function EditarHueco({ plan, fecha, momento, onCerrar }: { plan: 
               { valor: 'fuera', texto: '🍴 Fuera' },
             ]}
             valor={h.origen}
-            onCambio={(origen) => cambiar({ origen, recetaId: origen === 'nuevo' ? h.recetaId : null })}
+            onCambio={(origen) =>
+              cambiar({ origen, recetaId: origen === 'nuevo' ? h.recetaId : null, tupperId: origen === 'tupper-existente' ? h.tupperId : null, plato: origen === 'fuera' && !h.plato ? (momento === 'comida' ? 'Como fuera' : 'Ceno fuera') : h.plato })
+            }
           />
         </Campo>
-        {h.origen === 'tupper-existente' && !!tuppers?.length && (
-          <div className="flex flex-wrap gap-2">
-            {tuppers.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => cambiar({ plato: t.plato, tupperExistente: `${t.plato} (preparado ${t.preparadoEl})` })}
-                className="rounded-full bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900"
-              >
-                🥡 {t.plato}
-              </button>
-            ))}
-          </div>
+        {h.origen === 'tupper-existente' && (
+          <Campo grupo etiqueta="¿Qué tupper?">
+            {!tuppers?.length ? (
+              <p className="text-sm text-suave">No tienes tuppers guardados en Mi cocina.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {tuppers.map((t) => {
+                  const libres = racionesLibres(t, res)
+                  const elegido = h.tupperId === t.id
+                  return (
+                    <button
+                      key={t.id}
+                      disabled={!libres && !elegido}
+                      onClick={() => cambiar({ tupperId: t.id, plato: t.plato, tupperExistente: `${t.plato} (preparado ${t.preparadoEl})` })}
+                      className={`rounded-2xl px-3 py-2 text-left text-sm font-semibold disabled:opacity-40 ${elegido ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-900'}`}
+                    >
+                      🥡 {t.plato}
+                      <span className="block text-xs font-normal">
+                        {t.zona === 'congelador' ? '❄️' : '🧊'} {libres} {libres === 1 ? 'libre' : 'libres'} de {t.raciones}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </Campo>
         )}
         <Campo etiqueta="Plato">
           <input className={claseEntrada} value={h.plato} onChange={(e) => cambiar({ plato: e.target.value })} placeholder="Ej.: ensalada de pasta" />
@@ -60,6 +85,7 @@ export default function EditarHueco({ plan, fecha, momento, onCerrar }: { plan: 
           <input className={claseEntrada} value={h.nota ?? ''} onChange={(e) => cambiar({ nota: e.target.value || null })} />
         </Campo>
         <BotonPrincipal onClick={guardar}>Guardar</BotonPrincipal>
+        {actual.origen === 'nuevo' && actual.plato && <GuardarTupper plan={plan} plato={actual.plato} recetaId={actual.recetaId} />}
       </div>
     </Hoja>
   )

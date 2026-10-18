@@ -3,6 +3,7 @@ import { db, nuevoId } from '../datos/db'
 import type { PlanSemanal, RespuestasAsistente } from '../datos/tipos'
 import type { HuecoMenu, MenuIA } from '../ia/esquema'
 import { deTexto, hoy, sumarDias } from './fechas'
+import { consumirPasados, enlazarTuppersExistentes } from './tuppers'
 
 export const DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
 
@@ -63,6 +64,10 @@ export function menuEnBlanco(r: Pick<RespuestasAsistente, 'desde' | 'hasta' | 'd
 // Guarda un plan nuevo y sustituye la lista de la compra por la suya
 export async function guardarPlan(menu: MenuIA, respuestas?: RespuestasAsistente): Promise<string> {
   const id = nuevoId()
+  // Antes de cambiar de menú, se dan por comidas las raciones reservadas de días pasados
+  await consumirPasados()
+  // Los "tupper que ya tienes" del menú se enlazan con tus tuppers reales
+  await enlazarTuppersExistentes(menu)
   await db.transaction('rw', db.planes, db.compra, async () => {
     await db.planes.add({
       id,

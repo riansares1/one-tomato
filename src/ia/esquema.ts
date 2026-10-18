@@ -21,6 +21,9 @@ const hueco = z.object({
   tupperExistente: textoOpcional,
   paraLlevar: z.boolean().nullish().transform((v) => !!v),
   nota: textoOpcional,
+  // Solo los usa la app (no la IA): tupper reservado para este hueco y si ya se comió
+  tupperId: z.string().nullish(),
+  consumido: z.boolean().optional(),
 })
 
 const ingrediente = z.object({

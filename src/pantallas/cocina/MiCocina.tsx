@@ -10,7 +10,8 @@ import { db } from '../../datos/db'
 import type { Producto, Tupper, Zona } from '../../datos/tipos'
 import { caducidadTupper, categoria, ESTILO_URGENCIA, urgencia } from '../../logica/caducidad'
 import { diasEntre, fechaCorta, hoy, relativa } from '../../logica/fechas'
-import { borrarTupper, restaurarTupper } from '../../logica/inventario'
+import { usePlanActual } from '../../logica/plan'
+import { comerRacion, reservas } from '../../logica/tuppers'
 import FormProducto from './FormProducto'
 import FormTupper from './FormTupper'
 
@@ -32,6 +33,7 @@ export default function MiCocina() {
   const ajustes = useAjustes()
   const productos = useLiveQuery(() => db.productos.toArray(), [])
   const tuppers = useLiveQuery(() => db.tuppers.toArray(), [])
+  const reservadas = reservas(usePlanActual())
 
   const [editandoProducto, setEditandoProducto] = useState<Producto | 'nuevo' | null>(null)
   const [editandoTupper, setEditandoTupper] = useState<Tupper | 'nuevo' | null>(null)
@@ -71,7 +73,7 @@ export default function MiCocina() {
         ) : (
           <ul className="space-y-2.5">
             {listaTuppers.map(({ t, cad }) => (
-              <FilaTupper key={t.id} tupper={t} caducidad={cad} onTocar={() => setEditandoTupper(t)} />
+              <FilaTupper key={t.id} tupper={t} caducidad={cad} reservadas={reservadas.get(t.id) ?? 0} onTocar={() => setEditandoTupper(t)} />
             ))}
           </ul>
         )
@@ -168,19 +170,14 @@ function FilaProducto({ producto: p, onTocar }: { producto: Producto; onTocar: (
   )
 }
 
-function FilaTupper({ tupper: t, caducidad, onTocar }: { tupper: Tupper; caducidad: string; onTocar: () => void }) {
+function FilaTupper({ tupper: t, caducidad, reservadas, onTocar }: { tupper: Tupper; caducidad: string; reservadas: number; onTocar: () => void }) {
   const aviso = useAviso()
   const u = urgencia(caducidad)
   const dias = diasEntre(t.preparadoEl, hoy())
 
-  async function comerRacion() {
-    if (t.raciones > 1) {
-      await db.tuppers.update(t.id, { raciones: t.raciones - 1 })
-      aviso(`Una ración de ${t.plato} menos`, () => db.tuppers.update(t.id, { raciones: t.raciones }))
-    } else {
-      await borrarTupper(t.id)
-      aviso(`Tupper de ${t.plato} terminado`, () => restaurarTupper(t))
-    }
+  async function comerUna() {
+    const deshacer = await comerRacion(t)
+    aviso(t.raciones > 1 ? `Una ración de ${t.plato} menos` : `Tupper de ${t.plato} terminado`, deshacer)
   }
 
   async function pasarANevera() {
@@ -201,6 +198,7 @@ function FilaTupper({ tupper: t, caducidad, onTocar }: { tupper: Tupper; caducid
             {t.raciones} {t.raciones === 1 ? 'ración' : 'raciones'} · {t.zona === 'congelador' ? '❄️' : '🧊'}{' '}
             {dias === 0 ? 'hecho hoy' : `hecho hace ${dias} ${dias === 1 ? 'día' : 'días'}`}
             {t.enNeveraDesde && ' · descongelando'}
+            {reservadas > 0 && <span className="font-semibold text-emerald-700"> · {Math.min(reservadas, t.raciones)} en el menú</span>}
           </span>
           {t.estado === 'casi' && (
             <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
@@ -213,7 +211,7 @@ function FilaTupper({ tupper: t, caducidad, onTocar }: { tupper: Tupper; caducid
         </span>
       </button>
       <div className="flex gap-2 px-3.5 pb-3">
-        <button onClick={comerRacion} className="min-h-10 flex-1 rounded-xl bg-white/70 text-sm font-semibold ring-1 ring-black/5 active:bg-stone-100">
+        <button onClick={comerUna} className="min-h-10 flex-1 rounded-xl bg-white/70 text-sm font-semibold ring-1 ring-black/5 active:bg-stone-100">
           🍽️ Me como 1 ración
         </button>
         {t.zona === 'congelador' && (

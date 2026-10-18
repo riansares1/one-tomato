@@ -37,7 +37,7 @@ function vincular(menu: MenuIA, nuevos: Tupper[], h: string) {
     let libres = t.raciones
     for (const { fecha, hueco } of huecos(menu)) {
       if (libres <= 0) break
-      if (fecha < h || hueco.tupperId || hueco.origen !== 'nuevo') continue
+      if (fecha < h || hueco.tupperId || hueco.consumido || hueco.origen !== 'nuevo') continue
       const mismaReceta = t.recetaId ? hueco.recetaId === t.recetaId : comparable(hueco.plato) === comparable(t.plato)
       if (!mismaReceta) continue
       hueco.tupperId = t.id

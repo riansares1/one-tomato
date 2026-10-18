@@ -1,17 +1,28 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useAviso } from '../../componentes/Aviso'
-import { BotonPrincipal, Campo, claseEntrada, Selector } from '../../componentes/Campos'
+import { BotonPrincipal, BotonSecundario, Campo, claseEntrada, Selector } from '../../componentes/Campos'
 import Hoja from '../../componentes/Hoja'
 import { db } from '../../datos/db'
 import type { PlanSemanal } from '../../datos/tipos'
 import type { HuecoMenu } from '../../ia/esquema'
 import { cambiarHueco, etiquetaDia, huecoVacio } from '../../logica/plan'
 import { racionesLibres, reservas } from '../../logica/tuppers'
-import GuardarTupper from './GuardarTupper'
 
 // Cambiar a mano lo que comes en un momento del día
-export default function EditarHueco({ plan, fecha, momento, onCerrar }: { plan: PlanSemanal; fecha: string; momento: 'comida' | 'cena'; onCerrar: () => void }) {
+export default function EditarHueco({
+  plan,
+  fecha,
+  momento,
+  onCerrar,
+  onCocinado,
+}: {
+  plan: PlanSemanal
+  fecha: string
+  momento: 'comida' | 'cena'
+  onCerrar: () => void
+  onCocinado: (plato: string) => void
+}) {
   const aviso = useAviso()
   const tuppers = useLiveQuery(() => db.tuppers.toArray(), [])
   const actual = plan.menu.menu.find((d) => d.fecha === fecha)?.[momento] ?? huecoVacio()
@@ -85,7 +96,9 @@ export default function EditarHueco({ plan, fecha, momento, onCerrar }: { plan: 
           <input className={claseEntrada} value={h.nota ?? ''} onChange={(e) => cambiar({ nota: e.target.value || null })} />
         </Campo>
         <BotonPrincipal onClick={guardar}>Guardar</BotonPrincipal>
-        {actual.origen === 'nuevo' && actual.plato && <GuardarTupper plan={plan} plato={actual.plato} recetaId={actual.recetaId} />}
+        {actual.origen === 'nuevo' && actual.plato && !actual.consumido && (
+          <BotonSecundario onClick={() => onCocinado(actual.plato)}>👩‍🍳 Lo he cocinado</BotonSecundario>
+        )}
       </div>
     </Hoja>
   )

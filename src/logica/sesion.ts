@@ -115,28 +115,6 @@ async function aplicarRestas(restas: Resta[]) {
   }
 }
 
-// Guardar tuppers de una receta mientras cocinas (desde Semana).
-// La primera vez que guardas un tupper de una receta se restan sus ingredientes.
-export async function guardarTupperDeReceta(planId: string, tupper: Tupper, indicePropuesto?: number): Promise<{ restados: string[] }> {
-  const restados: string[] = []
-  await db.transaction('rw', db.planes, db.tuppers, db.productos, async () => {
-    const plan = await db.planes.get(planId)
-    if (!plan) return
-    const recetaId = tupper.recetaId
-    const descontar = !!recetaId && !plan.sesion.completadaEl && !(plan.sesion.recetasDescontadas ?? []).includes(recetaId)
-    if (descontar) {
-      const restas = calcularRestas(plan, await db.productos.toArray(), [recetaId])
-      await aplicarRestas(restas)
-      restados.push(...restas.filter((r) => r.producto && !r.problema && r.restar > 0).map((r) => r.producto!.nombre))
-    }
-    await guardarTuppers(planId, [tupper], (p) => ({
-      tuppersGuardados: indicePropuesto == null ? p.sesion.tuppersGuardados : [...(p.sesion.tuppersGuardados ?? []), indicePropuesto],
-      recetasDescontadas: descontar ? [...(p.sesion.recetasDescontadas ?? []), recetaId!] : p.sesion.recetasDescontadas,
-    }))
-  })
-  return { restados }
-}
-
 // Aplica el final de la sesión: todo o nada, y solo una vez por plan
 export async function terminarSesion(planId: string, tuppers: Tupper[], restas: Resta[]): Promise<boolean> {
   return db.transaction('rw', db.planes, db.tuppers, db.productos, db.recetas, async () => {

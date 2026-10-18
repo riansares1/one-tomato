@@ -12,7 +12,7 @@ import { avisosDeHoy, etiquetaDia } from '../../logica/plan'
 import { guardarComoFavorita } from '../../logica/recetas'
 import DetalleReceta from '../recetas/DetalleReceta'
 import EditarHueco from './EditarHueco'
-import GuardarTupper from './GuardarTupper'
+import LoHeCocinado from './LoHeCocinado'
 
 type Momento = 'comida' | 'cena'
 
@@ -22,6 +22,7 @@ export default function VistaMenu({ plan, onNuevaSemana, onPegarOtro }: { plan: 
   const congelados = misTuppers?.filter((t) => t.zona === 'congelador')
   const [receta, setReceta] = useState<{ receta: RecetaIA; fecha?: string; momento?: Momento } | null>(null)
   const [editando, setEditando] = useState<{ fecha: string; momento: Momento } | null>(null)
+  const [cocinando, setCocinando] = useState<{ plato: string; recetaId?: string | null; fecha?: string; momento?: Momento } | null>(null)
   const { menu } = plan
   const h = hoy()
   const avisos = avisosDeHoy(plan, congelados ?? [])
@@ -111,16 +112,30 @@ export default function VistaMenu({ plan, onNuevaSemana, onPegarOtro }: { plan: 
           pasos={receta.receta.pasos}
           enlace={receta.receta.enlaceOrigen}
           onCerrar={() => setReceta(null)}
-          arriba={<GuardarTupper plan={plan} plato={receta.receta.nombre} recetaId={receta.receta.id} />}
+          arriba={
+            <div className="space-y-2">
+              <BotonPrincipal
+                onClick={() => {
+                  setCocinando({ plato: receta.receta.nombre, recetaId: receta.receta.id, fecha: receta.fecha, momento: receta.momento })
+                  setReceta(null)
+                }}
+              >
+                👩‍🍳 Lo he cocinado
+              </BotonPrincipal>
+              {(plan.sesion.recetasDescontadas ?? []).includes(receta.receta.id) && (
+                <p className="text-center text-sm text-emerald-700">✓ Ya la cocinaste: sus ingredientes están restados y sus tuppers, guardados.</p>
+              )}
+            </div>
+          }
         >
-          <BotonPrincipal
+          <BotonSecundario
             onClick={async () => {
               const nueva = await guardarComoFavorita(receta.receta)
               aviso(nueva ? '⭐ Guardada en favoritas' : 'Ya estaba en favoritas')
             }}
           >
             ⭐ Guardar como favorita
-          </BotonPrincipal>
+          </BotonSecundario>
           {receta.fecha && receta.momento && (
             <BotonSecundario
               onClick={() => {
@@ -133,7 +148,18 @@ export default function VistaMenu({ plan, onNuevaSemana, onPegarOtro }: { plan: 
           )}
         </DetalleReceta>
       )}
-      {editando && <EditarHueco plan={plan} {...editando} onCerrar={() => setEditando(null)} />}
+      {editando && (
+        <EditarHueco
+          plan={plan}
+          {...editando}
+          onCerrar={() => setEditando(null)}
+          onCocinado={(plato) => {
+            setCocinando({ plato, fecha: editando.fecha, momento: editando.momento })
+            setEditando(null)
+          }}
+        />
+      )}
+      {cocinando && <LoHeCocinado plan={plan} {...cocinando} onCerrar={() => setCocinando(null)} />}
     </div>
   )
 }
@@ -142,7 +168,7 @@ function TarjetaHueco({ momento, hueco, fecha, plan, reales, onTocar }: { moment
   // ¿De qué tupper sale y dónde está guardado? Si ya hay un tupper real reservado, manda ese
   const real = hueco.tupperId ? reales.find((t) => t.id === hueco.tupperId) : undefined
   const propuesto = hueco.recetaId ? plan.menu.tuppersResultantes.find((t) => t.recetaId === hueco.recetaId && (t.paraComerEl === fecha || !t.paraComerEl)) : undefined
-  const tupper = real ?? (hueco.tupperId ? undefined : propuesto)
+  const tupper = real ?? (hueco.tupperId || hueco.consumido ? undefined : propuesto)
   const vacio = !hueco.plato
 
   const origen =

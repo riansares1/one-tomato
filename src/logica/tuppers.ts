@@ -121,4 +121,26 @@ export async function comerRacion(t: Tupper): Promise<() => Promise<void>> {
   }
 }
 
+// "Comido" en un hueco del menú: si sale de un tupper, se resta la ración ya.
+// Devuelve una función para deshacerlo.
+export async function comerHueco(planId: string, fecha: string, momento: 'comida' | 'cena'): Promise<() => Promise<void>> {
+  const plan = await db.planes.get(planId)
+  if (!plan) return async () => {}
+  const menuAntes = structuredClone(plan.menu)
+  const hueco = plan.menu.menu.find((d) => d.fecha === fecha)?.[momento]
+  const tupperAntes = hueco?.tupperId ? await db.tuppers.get(hueco.tupperId) : undefined
+  await db.transaction('rw', db.planes, db.tuppers, async () => {
+    const menu = structuredClone(plan.menu)
+    const h = menu.menu.find((d) => d.fecha === fecha)?.[momento]
+    if (!h || h.consumido) return
+    if (h.tupperId) await restarRacion(h.tupperId)
+    h.consumido = true
+    await db.planes.update(planId, { menu })
+  })
+  return async () => {
+    if (tupperAntes) await db.tuppers.put(tupperAntes)
+    await db.planes.update(planId, { menu: menuAntes })
+  }
+}
+
 export const nuevoTupper = (datos: Omit<Tupper, 'id' | 'preparadoEl'>): Tupper => ({ id: nuevoId(), preparadoEl: hoy(), ...datos })

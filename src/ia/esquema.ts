@@ -98,7 +98,8 @@ const aviso = z.union([
 export const esquemaMenu = z.object({
   version: z.number().optional(),
   semana: z.object({ desde: fecha, hasta: fecha }),
-  diaCocina: fecha,
+  // null si esa semana no se cocina (solo tuppers y platos rápidos)
+  diaCocina: fecha.nullish().transform((v) => v ?? null),
   menu: z.array(z.object({ fecha, comida: hueco, cena: hueco })).min(1, 'el menú no tiene días'),
   recetas: z.array(receta).default([]),
   listaCompra: z.array(itemCompra).default([]),
@@ -206,7 +207,7 @@ export function leerMenu(texto: string): ResultadoLectura {
 
   // Seguridad alimentaria
   for (const t of menu.tuppersResultantes) {
-    if (t.zona === 'nevera' && t.paraComerEl && diasEntre(menu.diaCocina, t.paraComerEl) > 4) {
+    if (t.zona === 'nevera' && t.paraComerEl && menu.diaCocina && diasEntre(menu.diaCocina, t.paraComerEl) > 4) {
       avisos.push(`"${t.plato}" va a la nevera pero se come el ${t.paraComerEl}, más de 4 días después de cocinar. Mejor congelarlo.`)
     }
     if (t.zona === 'congelador' && !t.pasarANeveraEl) {

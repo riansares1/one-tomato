@@ -11,7 +11,7 @@ import PasoIA from './PasoIA'
 import PegarMenu from './PegarMenu'
 import VistaMenu from './VistaMenu'
 
-type Modo = { tipo: 'menu' } | { tipo: 'asistente' } | { tipo: 'ia'; respuestas: RespuestasAsistente }
+type Modo = { tipo: 'menu' } | { tipo: 'asistente'; respuestas?: RespuestasAsistente } | { tipo: 'ia'; respuestas: RespuestasAsistente }
 
 export default function Semana() {
   const plan = usePlanActual()
@@ -29,7 +29,7 @@ export default function Semana() {
   }
 
   if (modo.tipo === 'ia') {
-    return <PasoIA respuestas={modo.respuestas} onMenu={(m) => usarMenu(m, modo.respuestas)} onAtras={() => setModo({ tipo: 'asistente' })} />
+    return <PasoIA respuestas={modo.respuestas} onMenu={(m) => usarMenu(m, modo.respuestas)} onAtras={() => setModo({ tipo: 'asistente', respuestas: modo.respuestas })} />
   }
 
   // Sin plan, o el último ya terminó → asistente
@@ -45,6 +45,7 @@ export default function Semana() {
           </div>
         )}
         <Asistente
+          inicial={modo.tipo === 'asistente' ? modo.respuestas : undefined}
           onPlanificarIA={(respuestas) => setModo({ tipo: 'ia', respuestas })}
           onAMano={(r) => usarMenu(menuEnBlanco(r), r)}
           onCancelar={hayPlanVigente ? () => setModo({ tipo: 'menu' }) : undefined}

@@ -4,10 +4,13 @@ import { ChefHat } from 'lucide-react'
 import { useAviso } from '../../componentes/Aviso'
 import { useAjustes } from '../../datos/ajustes'
 import { db } from '../../datos/db'
-import type { HuecoMenu } from '../../ia/esquema'
 import { caducidadTupper, categoria, ESTILO_URGENCIA, urgencia } from '../../logica/caducidad'
 import { diasEntre, hoy, relativa, sumarDias } from '../../logica/fechas'
 import { comidasDelDia, etiquetaDia, usePlanActual } from '../../logica/plan'
+import BotonComido from '../semana/BotonComido'
+import LoHeCocinado from '../semana/LoHeCocinado'
+import type { PlanSemanal } from '../../datos/tipos'
+import { useState } from 'react'
 import { valorar } from '../../logica/recetas'
 
 const tarjeta = 'rounded-3xl bg-tarjeta p-5 shadow-sm ring-1 ring-black/5'
@@ -16,6 +19,7 @@ export default function Inicio() {
   const ajustes = useAjustes()
   const aviso = useAviso()
   const plan = usePlanActual()
+  const [cocinando, setCocinando] = useState<Cocinando | null>(null)
   const productos = useLiveQuery(() => db.productos.toArray(), [])
   const tuppers = useLiveQuery(() => db.tuppers.toArray(), [])
   const pendientes = useLiveQuery(() => db.recetas.where('estado').equals('quiero-probar').filter((r) => !!r.probadaEl).toArray(), [])
@@ -37,7 +41,7 @@ export default function Inicio() {
   const avisosIA = (plan?.menu.avisos ?? []).filter((a) => a.fecha === h)
 
   const planVigente = plan && plan.hasta >= h ? plan : null
-  const tocaCocinar = planVigente && !planVigente.sesion.completadaEl && planVigente.menu.diaCocina <= h
+  const tocaCocinar = !!planVigente?.menu.diaCocina && !planVigente.sesion.completadaEl && planVigente.menu.diaCocina <= h && planVigente.menu.sesionCocina.pasos.length > 0
   const fecha = new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })
   const sinCopiaReciente = !ajustes.ultimaCopia || diasEntre(ajustes.ultimaCopia, h) > 30
   const hayDatos = productos.length + tuppers.length > 0
@@ -97,9 +101,9 @@ export default function Inicio() {
             <p className="text-suave">Tu menú empieza el {etiquetaDia(planVigente.desde)}.</p>
           ) : (
             <>
-              <Dia titulo="Hoy" dia={comidasDelDia(planVigente, h)} />
+              <Dia titulo="Hoy" fecha={h} plan={planVigente} onCocinar={setCocinando} />
               <div className="my-3 border-t border-stone-100" />
-              <Dia titulo="Mañana" dia={comidasDelDia(planVigente, manana)} />
+              <Dia titulo="Mañana" fecha={manana} plan={planVigente} onCocinar={setCocinando} />
             </>
           )}
           {!planVigente.sesion.completadaEl && planVigente.menu.diaCocina === manana && (
@@ -167,27 +171,36 @@ export default function Inicio() {
           💾 {ajustes.ultimaCopia ? 'Hace más de un mes que no guardas una copia de seguridad.' : 'Aún no has guardado ninguna copia de seguridad.'} <b>Hazla en Ajustes</b> (te lleva 10 segundos).
         </Link>
       )}
+      {cocinando && planVigente && <LoHeCocinado plan={planVigente} {...cocinando} onCerrar={() => setCocinando(null)} />}
     </div>
   )
 }
 
-function Dia({ titulo, dia }: { titulo: string; dia?: { comida: HuecoMenu; cena: HuecoMenu } }) {
+type Cocinando = { plato: string; recetaId?: string | null; fecha: string; momento: 'comida' | 'cena' }
+
+function Dia({ titulo, fecha, plan, onCocinar }: { titulo: string; fecha: string; plan: PlanSemanal; onCocinar: (c: Cocinando) => void }) {
+  const dia = comidasDelDia(plan, fecha)
   if (!dia) return <p className="text-suave">{titulo}: no está en el menú.</p>
-  const fila = (emoji: string, h: HuecoMenu) => (
-    <p className="flex gap-2">
-      <span>{emoji}</span>
-      <span className={h.plato ? '' : 'text-suave italic'}>
-        {h.plato || 'Sin decidir'}
-        {h.origen === 'tupper-existente' && <span className="text-sm text-emerald-700"> · 🥡 tupper</span>}
-        {h.paraLlevar && <span className="text-sm text-violet-700"> · 🎒 para llevar</span>}
-      </span>
-    </p>
-  )
+  const fila = (emoji: string, momento: 'comida' | 'cena') => {
+    const h = dia[momento]
+    return (
+      <div className="flex gap-2 py-0.5">
+        <span>{emoji}</span>
+        <span className={`flex-1 ${h.plato ? '' : 'text-suave italic'} ${h.consumido ? 'text-suave' : ''}`}>
+          {h.plato || 'Sin decidir'}
+          {h.origen === 'tupper-existente' && <span className="text-sm text-emerald-700"> · 🥡 tupper</span>}
+          {h.tupperId && h.origen === 'nuevo' && <span className="text-sm text-emerald-700"> · 🥡 en tupper</span>}
+          {h.paraLlevar && <span className="text-sm text-violet-700"> · 🎒 para llevar</span>}
+        </span>
+        <BotonComido planId={plan.id} fecha={fecha} momento={momento} hueco={h} onCocinar={() => onCocinar({ plato: h.plato, recetaId: h.recetaId, fecha, momento })} />
+      </div>
+    )
+  }
   return (
     <div>
       <p className="mb-1 text-sm font-bold tracking-wide text-suave uppercase">{titulo}</p>
-      {fila('☀️', dia.comida)}
-      {fila('🌙', dia.cena)}
+      {fila('☀️', 'comida')}
+      {fila('🌙', 'cena')}
     </div>
   )
 }

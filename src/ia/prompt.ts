@@ -1,6 +1,6 @@
 import type { Ajustes, Producto, Receta, RespuestasAsistente, Tupper } from '../datos/tipos'
 import { caducidadTupper } from '../logica/caducidad'
-import { deTexto, hoy } from '../logica/fechas'
+import { deTexto, hoy, sumarDias } from '../logica/fechas'
 import { mostrarNumero } from '../logica/numeros'
 
 // Todo lo que la IA necesita saber para planificar la semana
@@ -59,7 +59,9 @@ REGLAS
 8. Puedes repetir mis recetas favoritas cuando encajen con lo que tengo.
 9. Adapta a 1 persona las recetas que he elegido probar. Si el enlace es de una web, puedes abrirlo; si es un vídeo, básate en la descripción o nota guardada.
 10. Respeta SIEMPRE mis alergias y los alimentos que no como.
-11. Ordena los pasos de la sesión de cocina de la forma más eficiente (lo que más tarda, primero; aprovecha los tiempos de espera). Indica los minutos en los pasos que necesiten temporizador.
+11. Días SIN cocina: los días anteriores al día de cocina (o toda la semana, si ese día no cocino) se cubren con los tuppers que ya tengo, empezando por los que caducan antes y respetando su fecha límite; los del congelador, avisando de pasarlos a la nevera el día anterior. Si no hay tuppers suficientes, propón platos rápidos (15 minutos como mucho) con lo que tengo en casa, con origen "nuevo", sin receta en "recetas" y con una nota breve de cómo hacerlo.
+12. Si no hay día de cocina, pon "diaCocina": null, "recetas": [], "sesionCocina": {"duracionTotalMin": null, "pasos": []} y "tuppersResultantes": [].
+13. Ordena los pasos de la sesión de cocina de la forma más eficiente (lo que más tarda, primero; aprovecha los tiempos de espera). Indica los minutos en los pasos que necesiten temporizador.
 
 FORMATO DE RESPUESTA
 Responde SOLO con un bloque JSON válido, sin texto antes ni después, con exactamente esta estructura:
@@ -125,7 +127,11 @@ ${a.instruccionesIA.trim() ? `\nMIS INSTRUCCIONES EXTRA\n${a.instruccionesIA.tri
 DATOS DE ESTA SEMANA (hoy es ${conDia(hoy())})
 
 Semana a planificar: del ${conDia(r.desde)} al ${conDia(r.hasta)}.
-Día de cocina: ${conDia(r.diaCocina)}. Tiempo disponible para cocinar: ${r.tiempo}.
+${
+    r.diaCocina
+      ? `Día de cocina: ${conDia(r.diaCocina)}. Tiempo disponible para cocinar: ${r.tiempo}.${r.diaCocina > r.desde ? ` Hasta ese día (del ${conDia(r.desde)} al ${conDia(sumarDias(r.diaCocina, -1))}) NO cocino: tira de tuppers.` : ''}`
+      : 'Esta semana NO cocino: organiza todas las comidas con mis tuppers (primero los que caducan antes) y platos rápidos con lo que tengo.'
+  }
 Días que como en la uni (tupper para llevar, frío o fácil de transportar): ${r.diasUni.length ? r.diasUni.map(conDia).join(', ') : 'ninguno'}.
 Comidas o cenas fuera de casa: ${fuera.length ? fuera.join(', ') : 'ninguna'}.
 Antojos o platos que me apetecen: ${r.antojos.trim() || 'ninguno en especial'}.

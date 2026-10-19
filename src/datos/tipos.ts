@@ -98,7 +98,7 @@ export interface Receta {
 export interface RespuestasAsistente {
   desde: string
   hasta: string
-  diaCocina: string
+  diaCocina: string | null // null = esta semana no cocino
   diasUni: string[]
   fuera: { fecha: string; comida: boolean; cena: boolean }[]
   tiempo: string

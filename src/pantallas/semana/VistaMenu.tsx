@@ -12,6 +12,7 @@ import { avisosDeHoy, etiquetaDia } from '../../logica/plan'
 import { guardarComoFavorita } from '../../logica/recetas'
 import DetalleReceta from '../recetas/DetalleReceta'
 import EditarHueco from './EditarHueco'
+import BotonComido from './BotonComido'
 import LoHeCocinado from './LoHeCocinado'
 
 type Momento = 'comida' | 'cena'
@@ -43,16 +44,16 @@ export default function VistaMenu({ plan, onNuevaSemana, onPegarOtro }: { plan: 
           Del {fechaCorta(menu.semana.desde)} al {fechaCorta(menu.semana.hasta)}
         </h2>
         <p className="mt-1 text-white/90">
-          👩‍🍳 Cocinas el {etiquetaDia(menu.diaCocina)}
+          {menu.diaCocina ? `👩‍🍳 Cocinas el ${etiquetaDia(menu.diaCocina)}` : '🥡 Semana sin cocinar: tiramos de tuppers'}
           {menu.sesionCocina.duracionTotalMin ? ` · unos ${menu.sesionCocina.duracionTotalMin} min` : ''}
         </p>
         {sesionHecha ? (
           <p className="mt-3 rounded-2xl bg-white/20 px-4 py-3 font-semibold">✅ Sesión de cocina hecha el {fechaCorta(plan.sesion.completadaEl!)}</p>
-        ) : (
+        ) : menu.diaCocina && menu.sesionCocina.pasos.length > 0 ? (
           <Link to="/cocinar" className="mt-4 flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-white font-semibold text-tomate shadow-sm">
             <ChefHat size={20} /> Empezar sesión de cocina
           </Link>
-        )}
+        ) : null}
       </section>
 
       {avisos.map((a, i) => (
@@ -69,7 +70,10 @@ export default function VistaMenu({ plan, onNuevaSemana, onPegarOtro }: { plan: 
         const esHoy = dia.fecha === h
         const pasado = dia.fecha < h
         return (
-          <section key={dia.fecha} className={`rounded-3xl bg-tarjeta p-4 shadow-sm ring-1 ${esHoy ? 'ring-2 ring-tomate' : 'ring-black/5'} ${pasado ? 'opacity-55' : ''}`}>
+          <section
+            key={dia.fecha}
+            className={`rounded-3xl bg-tarjeta p-4 shadow-sm ring-1 ${esHoy ? 'ring-2 ring-tomate' : 'ring-black/5'} ${pasado ? 'opacity-55' : ''}`}
+          >
             <div className="mb-2 flex items-center justify-between px-1">
               <h3 className="text-lg font-bold capitalize">{etiquetaDia(dia.fecha)}</h3>
               {esHoy && <span className="rounded-full bg-tomate px-3 py-0.5 text-xs font-bold text-white">HOY</span>}
@@ -77,7 +81,16 @@ export default function VistaMenu({ plan, onNuevaSemana, onPegarOtro }: { plan: 
             </div>
             <div className="space-y-2">
               {(['comida', 'cena'] as const).map((m) => (
-                <TarjetaHueco key={m} momento={m} hueco={dia[m]} fecha={dia.fecha} plan={plan} reales={misTuppers ?? []} onTocar={() => tocar(dia.fecha, m, dia[m])} />
+                <TarjetaHueco
+                  key={m}
+                  momento={m}
+                  hueco={dia[m]}
+                  fecha={dia.fecha}
+                  plan={plan}
+                  reales={misTuppers ?? []}
+                  onTocar={() => tocar(dia.fecha, m, dia[m])}
+                  onCocinar={() => setCocinando({ plato: dia[m].plato, recetaId: dia[m].recetaId, fecha: dia.fecha, momento: m })}
+                />
               ))}
             </div>
           </section>
@@ -164,10 +177,28 @@ export default function VistaMenu({ plan, onNuevaSemana, onPegarOtro }: { plan: 
   )
 }
 
-function TarjetaHueco({ momento, hueco, fecha, plan, reales, onTocar }: { momento: Momento; hueco: HuecoMenu; fecha: string; plan: PlanSemanal; reales: Tupper[]; onTocar: () => void }) {
+function TarjetaHueco({
+  momento,
+  hueco,
+  fecha,
+  plan,
+  reales,
+  onTocar,
+  onCocinar,
+}: {
+  momento: Momento
+  hueco: HuecoMenu
+  fecha: string
+  plan: PlanSemanal
+  reales: Tupper[]
+  onTocar: () => void
+  onCocinar: () => void
+}) {
   // ¿De qué tupper sale y dónde está guardado? Si ya hay un tupper real reservado, manda ese
   const real = hueco.tupperId ? reales.find((t) => t.id === hueco.tupperId) : undefined
-  const propuesto = hueco.recetaId ? plan.menu.tuppersResultantes.find((t) => t.recetaId === hueco.recetaId && (t.paraComerEl === fecha || !t.paraComerEl)) : undefined
+  const propuesto = hueco.recetaId
+    ? plan.menu.tuppersResultantes.find((t) => t.recetaId === hueco.recetaId && (t.paraComerEl === fecha || !t.paraComerEl))
+    : undefined
   const tupper = real ?? (hueco.tupperId || hueco.consumido ? undefined : propuesto)
   const vacio = !hueco.plato
 
@@ -179,33 +210,40 @@ function TarjetaHueco({ momento, hueco, fecha, plan, reales, onTocar }: { moment
         : { texto: 'Se cocina nuevo', emoji: '🆕', clase: 'bg-orange-100 text-orange-800' }
 
   return (
-    <button onClick={onTocar} className="flex w-full items-start gap-3 rounded-2xl bg-fondo p-3 text-left active:scale-[0.99]">
-      <span className="mt-0.5 text-2xl">{momento === 'comida' ? '☀️' : '🌙'}</span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-xs font-semibold tracking-wide text-suave uppercase">{momento}</span>
-        <span className={`block font-semibold leading-snug ${vacio ? 'text-suave italic' : ''}`}>{vacio ? 'Sin decidir · toca para añadir' : hueco.plato}</span>
-        {!vacio && (
-          <span className="mt-1.5 flex flex-wrap gap-1.5 text-xs font-semibold">
-            <span className={`rounded-full px-2 py-0.5 ${origen.clase}`}>
-              {origen.emoji} {origen.texto}
-            </span>
-            {tupper && (
-              <span className={`rounded-full px-2 py-0.5 ${tupper.zona === 'congelador' ? 'bg-sky-100 text-sky-800' : 'bg-teal-50 text-teal-800'}`}>
-                {tupper.zona === 'congelador' ? '❄️ Congelador' : '🧊 Nevera'}
-              </span>
-            )}
-            {hueco.paraLlevar && <span className="rounded-full bg-violet-100 px-2 py-0.5 text-violet-800">🎒 Para llevar</span>}
-            {hueco.consumido ? (
-              <span className="rounded-full bg-stone-200 px-2 py-0.5 text-stone-700">✓ Comido</span>
-            ) : (
-              real && <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-white">🥡 Reservado</span>
-            )}
+    <div className="flex items-start gap-2 rounded-2xl bg-fondo p-3 pr-2">
+      <button onClick={onTocar} className="flex min-w-0 flex-1 items-start gap-3 text-left active:scale-[0.99]">
+        <span className="mt-0.5 text-2xl">{momento === 'comida' ? '☀️' : '🌙'}</span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-xs font-semibold tracking-wide text-suave uppercase">{momento}</span>
+          <span className={`block font-semibold leading-snug ${vacio ? 'text-suave italic' : ''}`}>
+            {vacio ? 'Sin decidir · toca para añadir' : hueco.plato}
           </span>
-        )}
-        {tupper?.zona === 'congelador' && tupper.pasarANeveraEl && <span className="mt-1 block text-xs text-sky-800">Pásalo a la nevera el {fechaCorta(tupper.pasarANeveraEl)}</span>}
-        {hueco.tupperExistente && <span className="mt-1 block text-xs text-suave">{hueco.tupperExistente}</span>}
-        {hueco.nota && <span className="mt-1 block text-xs text-suave">{hueco.nota}</span>}
-      </span>
-    </button>
+          {!vacio && (
+            <span className="mt-1.5 flex flex-wrap gap-1.5 text-xs font-semibold">
+              <span className={`rounded-full px-2 py-0.5 ${origen.clase}`}>
+                {origen.emoji} {origen.texto}
+              </span>
+              {tupper && (
+                <span className={`rounded-full px-2 py-0.5 ${tupper.zona === 'congelador' ? 'bg-sky-100 text-sky-800' : 'bg-teal-50 text-teal-800'}`}>
+                  {tupper.zona === 'congelador' ? '❄️ Congelador' : '🧊 Nevera'}
+                </span>
+              )}
+              {hueco.paraLlevar && <span className="rounded-full bg-violet-100 px-2 py-0.5 text-violet-800">🎒 Para llevar</span>}
+              {hueco.consumido ? (
+                <span className="rounded-full bg-stone-200 px-2 py-0.5 text-stone-700">✓ Comido</span>
+              ) : (
+                real && <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-white">🥡 Reservado</span>
+              )}
+            </span>
+          )}
+          {tupper?.zona === 'congelador' && tupper.pasarANeveraEl && (
+            <span className="mt-1 block text-xs text-sky-800">Pásalo a la nevera el {fechaCorta(tupper.pasarANeveraEl)}</span>
+          )}
+          {hueco.tupperExistente && <span className="mt-1 block text-xs text-suave">{hueco.tupperExistente}</span>}
+          {hueco.nota && <span className="mt-1 block text-xs text-suave">{hueco.nota}</span>}
+        </span>
+      </button>
+      <BotonComido planId={plan.id} fecha={fecha} momento={momento} hueco={hueco} onCocinar={onCocinar} />
+    </div>
   )
 }
